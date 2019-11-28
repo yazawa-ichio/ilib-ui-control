@@ -198,7 +198,7 @@ namespace ILib.UI
 
 				ui.SetController(this);
 
-				var behind = parent?.Control?.OnBehind() ?? null;
+				var behind = parent?.Control?.OnBehind() ?? Util.Successed;
 
 				await ui.OnCreated(prm);
 
@@ -240,7 +240,7 @@ namespace ILib.UI
 		{
 			if (controls == null || controls.Length == 0)
 			{
-				return null;
+				return Util.Successed;
 			}
 			return Task.WhenAll(controls.Select(async x =>
 			{
