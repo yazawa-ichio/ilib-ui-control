@@ -208,7 +208,10 @@ namespace ILib.UI
 				{
 					await behind;
 					behind = null;
-					if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+					if (parent != null && parent.Control != null)
+					{
+						if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+					}
 				}
 
 				await ui.OnFront(open: true);
@@ -216,7 +219,10 @@ namespace ILib.UI
 				if (behind != null)
 				{
 					await behind;
-					if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+					if (parent != null && parent.Control != null)
+					{
+						if(parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+					}
 				}
 
 				await OnEndOpen();
