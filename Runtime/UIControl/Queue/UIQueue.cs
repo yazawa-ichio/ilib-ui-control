@@ -70,8 +70,6 @@ namespace ILib.UI
 
 		public async Task Close(IQueueEntry entry)
 		{
-			if (HasProcess) return;
-
 			if (m_Run)
 			{
 				return;
@@ -93,11 +91,11 @@ namespace ILib.UI
 					var prev = m_Queue[0];
 					m_Queue.RemoveAt(0);
 					prev.SetClose();
-					if (m_Queue.Count == 1)
+					if (m_Queue.Count > 0)
 					{
 						//これはClose中に来たものなので待たなくてもいい
 #pragma warning disable CS4014
-						m_Queue[1].Open();
+						m_Queue[0].Open();
 #pragma warning restore CS4014
 					}
 				}
