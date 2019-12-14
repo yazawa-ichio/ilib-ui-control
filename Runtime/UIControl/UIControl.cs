@@ -36,6 +36,8 @@ namespace ILib.UI
 		/// </summary>
 		protected IController Controller { get; private set; }
 
+		protected TParam Param { get; private set; }
+
 		[SerializeField]
 		bool m_IsDeactivateInBehind = false;
 
@@ -61,15 +63,38 @@ namespace ILib.UI
 
 		Task IControl.OnCreated(object prm)
 		{
+			//nullは許容する
+			if (prm == null)
+			{
+				Param = (TParam)prm;
+			}
 			Transition?.OnPreCreated();
-			return OnCreated((TParam)prm);
+			return OnCreated(Param);
 		}
 
-		Task IControl.OnClose() => OnClose();
+		async Task IControl.OnClose()
+		{
+			UIControlLog.Trace("[ilib-ui] OnClose:{0}", this);
+			await OnPreClose();
+			await OnCloseTransition();
+			await OnClose();
+		}
 
-		Task IControl.OnFront(bool open) => OnFront(open);
+		async Task IControl.OnFront(bool open)
+		{
+			UIControlLog.Trace("[ilib-ui] OnFront:{0}, open:{1}", this, open);
+			await OnPreFront(open);
+			await OnFrontTransition(open);
+			await OnFront(open);
+		}
 
-		Task IControl.OnBehind() => OnBehind();
+		async Task IControl.OnBehind()
+		{
+			UIControlLog.Trace("[ilib-ui] OnBehind:{0}", this);
+			await OnPreBehind();
+			await OnBehindTransition();
+			await OnBehind();
+		}
 
 		/// <summary>
 		/// UIが作成された直後に実行されます。
@@ -78,18 +103,50 @@ namespace ILib.UI
 
 		/// <summary>
 		/// UIを削除する直前に実行されます。
+		/// 非表示のアニメーションよりも前に実行されます。
+		/// </summary>
+		protected virtual Task OnPreClose() => Util.Successed;
+
+		/// <summary>
+		/// UIを削除する直前に実行されます。
+		/// 非表示のアニメーションよりも後に実行されます。
 		/// デフォルトでは可能であれば閉じるアニメーションを実行します。
 		/// アクティブではない場合は何も行いません。
 		/// </summary>
-		protected virtual Task OnClose() => (IsActive && Transition != null) ? Transition.Hide(true) : Util.Successed;
+		protected virtual Task OnClose() => Util.Successed;
+
+		/// <summary>
+		/// UIを削除する直前に実行されます。
+		/// デフォルトでは可能であれば閉じるアニメーションを実行します。
+		/// アクティブではない場合は何も行いません。
+		/// </summary>
+		protected virtual Task OnCloseTransition() => (IsActive && Transition != null) ? Transition.Hide(true) : Util.Successed;
+
+		/// <summary>
+		/// UIが最前面に来た際に実行されます。オープン処理かどうかは引数で確認できます。
+		/// アニメーションよりも早くに実行されます。
+		/// </summary>
+		protected virtual Task OnPreFront(bool open)
+		{
+			return Util.Successed;
+		}
+
+		/// <summary>
+		/// UIが最前面に来た際に実行されます。オープン処理かどうかは引数で確認できます。
+		/// 表示のアニメーションよりも後に実行されます。
+		/// デフォルトでは可能であれば開くアニメーションを実行します。
+		/// </summary>
+		protected virtual Task OnFront(bool open)
+		{
+			return Util.Successed;
+		}
 
 		/// <summary>
 		/// UIが最前面に来た際に実行されます。オープン処理かどうかは引数で確認できます。
 		/// デフォルトでは可能であれば開くアニメーションを実行します。
 		/// </summary>
-		protected virtual Task OnFront(bool open)
+		protected virtual Task OnFrontTransition(bool open)
 		{
-			UIControlLog.Trace("[ilib-ui] OnFront:{0}, open:{1}", this, open);
 			if ((open || IsHideInBehind) && Transition != null)
 			{
 				var show = Transition.Show(open);
@@ -100,11 +157,28 @@ namespace ILib.UI
 
 		/// <summary>
 		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
-		/// デフォルトでは可能であれば開くアニメーションを実行します。
+		/// アニメーションよりも早くに実行されます。
+		/// </summary>
+		protected virtual Task OnPreBehind()
+		{
+			return Util.Successed;
+		}
+
+		/// <summary>
+		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
+		/// アニメーションよりも後に実行されます。
 		/// </summary>
 		protected virtual Task OnBehind()
 		{
-			UIControlLog.Trace("[ilib-ui] OnBehind:{0}", this);
+			return Util.Successed;
+		}
+
+		/// <summary>
+		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
+		/// デフォルトでは可能であれば閉じるアニメーションを実行します。
+		/// </summary>
+		protected virtual Task OnBehindTransition()
+		{
 			if (IsHideInBehind && Transition != null)
 			{
 				var hide = Transition.Hide(false);
@@ -112,6 +186,7 @@ namespace ILib.UI
 			}
 			return Util.Successed;
 		}
+
 
 	}
 }
