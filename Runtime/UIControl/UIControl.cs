@@ -64,7 +64,7 @@ namespace ILib.UI
 		Task IControl.OnCreated(object prm)
 		{
 			//nullは許容する
-			if (prm == null)
+			if (prm != null)
 			{
 				Param = (TParam)prm;
 			}
