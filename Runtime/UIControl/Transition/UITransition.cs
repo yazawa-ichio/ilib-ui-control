@@ -113,7 +113,14 @@ namespace ILib.UI
 
 			public void Init()
 			{
-				m_Target.localPosition = m_HidePos;
+				if (m_Target is RectTransform rect)
+				{
+					rect.anchoredPosition3D = m_HidePos;
+				}
+				else
+				{
+					m_Target.localPosition = m_HidePos;
+				}
 			}
 
 			public Task Run(MonoBehaviour owner, bool show)
@@ -139,7 +146,15 @@ namespace ILib.UI
 						{
 							rate = m_Curve.Evaluate(1f - cur / m_Time);
 						}
-						m_Target.localPosition = m_HidePos + (m_ShowPos - m_HidePos) * rate;
+						var pos = m_HidePos + (m_ShowPos - m_HidePos) * rate;
+						if (m_Target is RectTransform rect)
+						{
+							rect.anchoredPosition3D = pos;
+						}
+						else
+						{
+							m_Target.localPosition = pos;
+						}
 					}
 					catch (Exception ex)
 					{
@@ -151,7 +166,14 @@ namespace ILib.UI
 				}
 				try
 				{
-					m_Target.localPosition = show ? m_ShowPos : m_HidePos;
+					if (m_Target is RectTransform rect)
+					{
+						rect.anchoredPosition3D = show ? m_ShowPos : m_HidePos;
+					}
+					else
+					{
+						m_Target.localPosition = show ? m_ShowPos : m_HidePos;
+					}
 					ret.SetResult(true);
 				}
 				catch (Exception ex)
