@@ -1,8 +1,6 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using System.Threading;
-using UnityEngine;
+using System.Threading.Tasks;
 
 namespace ILib.UI
 {
@@ -20,6 +18,10 @@ namespace ILib.UI
 	{
 		bool m_Run = false;
 		List<QueueEntry> m_Queue = new List<QueueEntry>();
+
+		public int Count => m_Queue.Count;
+
+		public bool IsEmpty => !m_Run && m_Queue.Count == 0;
 
 		protected override IEnumerable<T> GetActive<T>()
 		{

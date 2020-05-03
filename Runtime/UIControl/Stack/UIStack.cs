@@ -1,9 +1,8 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using UnityEngine;
-using System;
 using System.Linq;
 using System.Threading.Tasks;
+using UnityEngine;
 
 namespace ILib.UI
 {
@@ -16,10 +15,14 @@ namespace ILib.UI
 	/// <summary>
 	/// UIの表示をスタック制御で行います。
 	/// </summary>
-	public abstract class UIStack<TParam, UControl> : UIController<TParam, UControl> , IStackController where UControl : class, IControl
+	public abstract class UIStack<TParam, UControl> : UIController<TParam, UControl>, IStackController where UControl : class, IControl
 	{
 
 		List<UIInstance> m_Stack = new List<UIInstance>();
+
+		public int Count => m_Stack.Count;
+
+		public bool IsEmpty => m_Stack.Count == 0;
 
 		protected override IEnumerable<T> GetActive<T>()
 		{
@@ -82,7 +85,7 @@ namespace ILib.UI
 			return task.Task;
 		}
 
-		async void PushImpl(string path, TParam prm, StackEntry entry) 
+		async void PushImpl(string path, TParam prm, StackEntry entry)
 		{
 			var parent = m_Stack.Count > 0 ? m_Stack[m_Stack.Count - 1] : null;
 			try
@@ -148,7 +151,7 @@ namespace ILib.UI
 			}
 			releases = m_Stack.Skip(index).ToArray();
 			m_Stack.RemoveRange(index, m_Stack.Count - index);
-			
+
 			front = instance.Parent;
 
 			try
