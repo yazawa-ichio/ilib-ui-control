@@ -76,7 +76,7 @@ namespace ILib.UI
 		/// <summary>
 		/// 現在アクティブな指定型のUIに対して一つだけ処理を行います。
 		/// </summary>
-		public bool ExecuteAnyOne<T>(Func<T,bool> action)
+		public bool ExecuteAnyOne<T>(Func<T, bool> action)
 		{
 			UIControlLog.Debug("[ilib-ui] ExecuteAnyOne<{0}>(Func<{0}, bool>)", typeof(T));
 			foreach (var ui in GetActive<T>())
@@ -129,7 +129,7 @@ namespace ILib.UI
 				UIControlLog.Trace("[ilib-ui] OnStartProcess");
 				OnStartProcess();
 			}
-			 m_ProcessCount++;
+			m_ProcessCount++;
 		}
 
 		protected void EndProcess()
@@ -221,7 +221,7 @@ namespace ILib.UI
 					await behind;
 					if (parent != null && parent.Control != null)
 					{
-						if(parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+						if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
 					}
 				}
 

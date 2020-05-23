@@ -201,7 +201,7 @@ namespace ILib.UI
 
 		public void OnPreCreated()
 		{
-			m_Anim = new IAnim[] { m_Fade, m_Move }; 
+			m_Anim = new IAnim[] { m_Fade, m_Move };
 			foreach (var anim in m_Anim)
 			{
 				anim.Init();
