@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,14 +15,17 @@ namespace ILib.UI
 	/// UIの表示をキュー制御で行います。現在のUIが閉じられるまで、次の表示リクエストは実行されません。
 	/// 表示前に不要になったリクエストはキャンセルできます。
 	/// </summary>
-	public abstract class UIQueue<TParam, UControl> : UIController<TParam, UControl>, IQueueController where UControl : class, IControl
+	public abstract class UIQueue<TParam, UControl> : UIController<TParam, UControl> where UControl : class, IControl
 	{
 		bool m_Run = false;
-		List<QueueEntry> m_Queue = new List<QueueEntry>();
+		List<IInternalQueueEntry<TParam>> m_Queue = new List<IInternalQueueEntry<TParam>>();
 
 		public int Count => m_Queue.Count;
 
 		public bool IsEmpty => !m_Run && m_Queue.Count == 0;
+
+		bool m_HasError;
+		IInternalQueueEntry<TParam> m_Current;
 
 		protected override IEnumerable<T> GetActive<T>()
 		{
@@ -35,84 +39,146 @@ namespace ILib.UI
 
 		public IQueueEntry Enqueue(string path, TParam prm, CancellationToken token = default)
 		{
-			var entry = new QueueEntry(this, token);
-			entry.SetOpenAction(() => EnqueueImpl(entry, path, prm));
+			var entry = new QueueEntry<TParam>(token, path, prm);
 			m_Queue.Add(entry);
-			if (m_Queue.Count == 1)
-			{
-				entry.Open();
-			}
+			TryRun();
 			return entry;
 		}
 
-		async Task<UIInstance> EnqueueImpl(QueueEntry entry, string path, TParam prm)
+		public IQueueQuery<TResult> Query<TResult>(string path, TParam prm, CancellationToken token = default)
 		{
-			if (m_Queue.Count == 1)
+			var entry = new QueueEntry<TParam>(token, path, prm);
+			var query = new QueueQuery<TParam, TResult>(entry);
+			m_Queue.Add(query);
+			TryRun();
+			return query;
+		}
+
+		public void RepairError(bool clear = false)
+		{
+			if (!m_HasError) return;
+			m_HasError = false;
+			m_Run = false;
+			if (clear)
 			{
-				return await Open<UControl>(path, prm);
+				while (m_Queue.Count > 0)
+				{
+					m_Queue[0].Abort();
+					m_Queue.RemoveAt(0);
+				}
 			}
 			else
 			{
-				var prev = m_Queue[0];
-				m_Queue.RemoveAt(0);
-				var ret = await Change<UControl>(path, prm, null, new UIInstance[] { prev.Instance });
-				prev.SetClose();
-				return ret;
+				Run();
 			}
 		}
 
 		protected override Task Close(IControl control)
 		{
-			if (m_Queue.Count > 0 && m_Queue[0].Instance?.Control == control)
+			if (m_Current.Instance?.Control == control)
 			{
-				return Close(m_Queue[0]);
+				return m_Current.Close();
 			}
 			return Util.Successed;
 		}
 
-		public async Task Close(IQueueEntry entry)
+		protected virtual void HandleError(Exception ex)
 		{
-			if (m_Run)
-			{
-				return;
-			}
-			m_Run = true;
+		}
 
-			try
+		void TryRun()
+		{
+			if (!m_Run && !m_HasError)
 			{
-				var _entry = (entry as QueueEntry);
-				if (m_Queue.Count == 0 || m_Queue[0] != _entry)
-				{
-					m_Queue.Remove(_entry);
-					return;
-				}
-
-				if (m_Queue.Count == 1)
-				{
-					await Close(new UIInstance[] { _entry.Instance });
-					var prev = m_Queue[0];
-					m_Queue.RemoveAt(0);
-					prev.SetClose();
-					if (m_Queue.Count > 0)
-					{
-						//これはClose中に来たものなので待たなくてもいい
-#pragma warning disable CS4014
-						m_Queue[0].Open();
-#pragma warning restore CS4014
-					}
-				}
-				else
-				{
-					await m_Queue[1].Open();
-				}
-			}
-			finally
-			{
-				m_Run = false;
+				Run();
 			}
 		}
 
+		async void Run()
+		{
+			try
+			{
+				m_Run = true;
+				await RunImpl();
+				m_Run = false;
+			}
+			catch (Exception ex)
+			{
+				m_HasError = true;
+				HandleError(ex);
+			}
+		}
 
+		async Task RunImpl()
+		{
+			while (m_Queue.Count > 0)
+			{
+				await Open();
+
+				await m_Current.WaitCloseRequest();
+
+				await Close();
+			}
+		}
+
+		async Task Open()
+		{
+			var prev = m_Current;
+			m_Current = m_Queue[0];
+			m_Queue.RemoveAt(0);
+			m_Current.PreOpen();
+			try
+			{
+				if (prev == null)
+				{
+					m_Current.Instance = await Open<UControl>(m_Current.Path, m_Current.Param);
+				}
+				else
+				{
+					prev.PreClose();
+					m_Current.Instance = await Change<UControl>(m_Current.Path, m_Current.Param, null, new UIInstance[] { prev.Instance });
+					prev.CompleteClose();
+				}
+			}
+			catch (Exception ex)
+			{
+				UIControlLog.Warning("[ilib-ui] {0}", ex);
+				prev?.Fail(ex);
+				m_Current.Fail(ex);
+				m_Current = null;
+				throw;
+			}
+		}
+
+		async Task Close()
+		{
+
+			//キャンセル済を削除
+			while (m_Queue.Count > 0 && m_Queue[0].IsClosed)
+			{
+				m_Queue.RemoveAt(0);
+				continue;
+			}
+
+			//残りのリクエストがなければClose実行
+			if (m_Queue.Count == 0)
+			{
+				try
+				{
+					m_Current.PreClose();
+					await Close(new UIInstance[] { m_Current.Instance });
+					m_Current.CompleteClose();
+					m_Current = null;
+				}
+				catch (Exception ex)
+				{
+					UIControlLog.Warning("[ilib-ui] {0}", ex);
+					m_Current.Fail(ex);
+					m_Current = null;
+					throw;
+				}
+			}
+		}
 	}
 
 }

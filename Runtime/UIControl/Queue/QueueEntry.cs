@@ -1,97 +1,98 @@
 ﻿using System;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Runtime.CompilerServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ILib.UI
 {
-	internal class QueueEntry : IQueueEntry
+	internal class QueueEntry<TParam> : IInternalQueueEntry<TParam>
 	{
-		public bool IsClosed
+
+		public bool IsClosed { get; private set; }
+
+		public string Path { get; private set; }
+
+		public TParam Param { get; private set; }
+
+		public Exception Error { get; private set; }
+
+		public UIInstance Instance { get; set; }
+
+		public bool IsWaitCloseCompleted { get; set; }
+
+		bool m_WaitOpen = true;
+		Action<Exception> m_OnComplete;
+		TaskCompletionSource<bool> m_CloseRequest = new TaskCompletionSource<bool>();
+
+		public QueueEntry(CancellationToken token, string path, TParam param)
 		{
-			get
+			if (token != default)
 			{
-				if (m_Cancel) return true;
-				if (Instance != null)
-				{
-					return Instance.Object == null;
-				}
-				return false;
+				token.Register(() => Dispose());
 			}
+			Path = path;
+			Param = param;
 		}
 
-		public UIInstance Instance
+		public void PreOpen()
 		{
-			get
+			m_WaitOpen = false;
+		}
+
+		public Task Close()
+		{
+			m_CloseRequest.TrySetResult(true);
+			if (m_WaitOpen)
 			{
-				if (m_Opening == null || !m_Opening.IsCompleted) return null;
-				return m_Opening?.Result ?? null;
+				CompleteClose();
 			}
-		}
-
-		IQueueController m_Parent;
-		CancellationToken m_Token;
-
-		Func<Task<UIInstance>> m_Open;
-		Task<UIInstance> m_Opening;
-		bool m_Close;
-		bool m_Cancel;
-		Action m_OnClosed;
-
-		public QueueEntry(IQueueController parent, CancellationToken token)
-		{
-			m_Parent = parent;
-			token.Register(async () => await Close());
-		}
-
-		public void SetOpenAction(Func<Task<UIInstance>> open)
-		{
-			m_Open = open;
-		}
-
-		public Task Open()
-		{
-			if (m_Open == null) return (m_Opening as Task) ?? Util.Successed;
-			m_Opening = m_Open();
-			m_Open = null;
-			return m_Opening;
-		}
-
-		public async Task Close()
-		{
-			if (m_Close) return;
-			m_Close = true;
-			if (m_Opening == null)
-			{
-				m_Cancel = true;
-				m_Open = null;
-				await m_Parent.Close(this);
-			}
-			else
-			{
-				await m_Opening;
-				await m_Parent.Close(this);
-			}
+			return WaitClose(default);
 		}
 
 		public async void Dispose()
 		{
-			await Close();
+			try
+			{
+				await Close();
+			}
+			catch (Exception ex)
+			{
+				UIControlLog.Exception(ex);
+			}
 		}
 
-		public async Task WaitClose(CancellationToken token)
+		public void Abort()
 		{
-			if (m_Close) return;
+			m_CloseRequest.TrySetException(new Exception("abort UIQueue Request"));
+			CompleteClose();
+		}
+
+		public Task WaitClose(CancellationToken token)
+		{
+			if (Error != null) return Task.FromException(Error);
+
+			if (IsClosed) return Util.Successed;
+
 			TaskCompletionSource<bool> task = new TaskCompletionSource<bool>();
-			m_OnClosed += () =>
+			m_OnComplete += (ex) =>
 			{
-				task.TrySetResult(true);
+				if (ex != null)
+				{
+					task.TrySetException(ex);
+				}
+				else
+				{
+					task.TrySetResult(true);
+				}
 			};
-			token.Register(() =>
+			if (default != token)
 			{
-				task.TrySetCanceled(token);
-			});
-			await task.Task;
+				token.Register(() =>
+				{
+					task.TrySetCanceled(token);
+				});
+			}
+			return task.Task;
 		}
 
 		public TaskAwaiter GetAwaiter()
@@ -99,11 +100,51 @@ namespace ILib.UI
 			return WaitClose(default).GetAwaiter();
 		}
 
-		public void SetClose()
+
+		public void PreClose()
 		{
-			m_Close = true;
-			m_OnClosed?.Invoke();
-			m_OnClosed = null;
+			if (!IsWaitCloseCompleted)
+			{
+				CloseImpl();
+			}
+		}
+
+		public void CompleteClose()
+		{
+			if (IsWaitCloseCompleted)
+			{
+				CloseImpl();
+			}
+		}
+
+		void CloseImpl()
+		{
+			IsClosed = true;
+			m_OnComplete?.Invoke(null);
+			m_OnComplete = null;
+			Param = default;
+			Path = null;
+		}
+
+		public Task WaitCloseRequest()
+		{
+			return m_CloseRequest.Task;
+		}
+
+		public void Fail(Exception ex)
+		{
+			Error = ex;
+			IsClosed = true;
+			m_OnComplete?.Invoke(ex);
+			m_OnComplete = null;
+			Param = default;
+			Path = null;
+
+			if (Instance != null && Instance.Object != null)
+			{
+				UnityEngine.GameObject.Destroy(Instance.Object);
+			}
+
 		}
 	}
 
