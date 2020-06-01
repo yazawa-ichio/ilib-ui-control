@@ -29,8 +29,7 @@ namespace ILib.UI
 
 		protected override IEnumerable<T> GetActive<T>()
 		{
-			if (m_Queue.Count == 0) yield break;
-			var ui = m_Queue[0]?.Instance?.Control ?? null;
+			var ui = m_Current?.Instance?.Control ?? null;
 			if (ui != null && ui.IsActive && ui is T target)
 			{
 				yield return target;

@@ -1,10 +1,8 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System;
-using UnityEngine;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Threading;
+using UnityEngine;
 
 namespace ILib.UI
 {
@@ -92,6 +90,11 @@ namespace ILib.UI
 		/// </summary>
 		public bool ExecuteBack()
 		{
+			// 実行中は処理した扱いにする
+			if (HasProcess)
+			{
+				return true;
+			}
 			UIControlLog.Trace("[ilib-ui] Do ExecuteBack()");
 			return ExecuteAnyOne<IExecuteBack>(x =>
 			{

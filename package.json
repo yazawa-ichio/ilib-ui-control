@@ -1,7 +1,7 @@
 {
   "name": "jp.yazawa-ichio.ilib-ui-control",
   "displayName":  "ILib.UI UIControl",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "unity": "2018.4",
   "description": "Unity Stack And Queue UI Control Package.",
   "keywords": [ ],
