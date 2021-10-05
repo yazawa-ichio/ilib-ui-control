@@ -18,13 +18,15 @@ namespace ILib.UI
 		/// <summary>
 		///　Behind時に自身のゲームオブジェクトを非アクティブにするか？
 		/// </summary>
-		public virtual bool IsDeactivateInBehind { get => m_IsDeactivateInBehind; }
+		[System.Obsolete("IsBehindDeactivate関数に変更になりました", true)]
+		public virtual bool IsDeactivateInBehind => IsBehindDeactivate(HideTransitionOption.Default);
 
 		/// <summary>
 		///　Behind時に非表示アニメーション処理を実行するか？
 		///　デフォルトの動作はIsDeactivateInBehindと同じ値になります。
 		/// </summary>
-		public virtual bool IsHideInBehind { get => IsDeactivateInBehind; }
+		[System.Obsolete("UseHideTransition関数に変更になりました", true)]
+		public virtual bool IsHideInBehind => IsDeactivateInBehind;
 
 		/// <summary>
 		/// アニメーションによる遷移を行うクラスです。
@@ -40,6 +42,7 @@ namespace ILib.UI
 
 		[SerializeField]
 		bool m_IsDeactivateInBehind = false;
+		bool m_InHide;
 
 		void IControl.SetController(IController controller)
 		{
@@ -88,12 +91,18 @@ namespace ILib.UI
 			await OnFront(open);
 		}
 
-		async Task IControl.OnBehind()
+		async Task<bool> IControl.OnBehind(object frontParam)
 		{
 			UIControlLog.Trace("[ilib-ui] OnBehind:{0}", this);
 			await OnPreBehind();
-			await OnBehindTransition();
+			var hideOption = HideTransitionOption.Default;
+			if (frontParam is IBehindTargetOption option)
+			{
+				hideOption = option.HideOption;
+			}
+			m_InHide = await OnBehindTransition(hideOption);
 			await OnBehind();
+			return m_InHide;
 		}
 
 		/// <summary>
@@ -132,7 +141,7 @@ namespace ILib.UI
 		}
 
 		/// <summary>
-		/// UIが最前面に来た際に実行されます。オープン処理かどうかは引数で確認できます。
+		/// UIが最前面に来た際に実行されます。
 		/// 表示のアニメーションよりも後に実行されます。
 		/// デフォルトでは可能であれば開くアニメーションを実行します。
 		/// </summary>
@@ -142,12 +151,14 @@ namespace ILib.UI
 		}
 
 		/// <summary>
-		/// UIが最前面に来た際に実行されます。オープン処理かどうかは引数で確認できます。
+		/// UIが最前面に来た際に実行されます。
 		/// デフォルトでは可能であれば開くアニメーションを実行します。
 		/// </summary>
 		protected virtual Task OnFrontTransition(bool open)
 		{
-			if ((open || IsHideInBehind) && Transition != null)
+			var inHide = m_InHide;
+			m_InHide = false;
+			if ((open || inHide) && Transition != null)
 			{
 				var show = Transition.Show(open);
 				if (show != null) return show;
@@ -159,34 +170,69 @@ namespace ILib.UI
 		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
 		/// アニメーションよりも早くに実行されます。
 		/// </summary>
-		protected virtual Task OnPreBehind()
-		{
-			return Util.Successed;
-		}
+		protected virtual Task OnPreBehind() => Util.Successed;
 
 		/// <summary>
 		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
 		/// アニメーションよりも後に実行されます。
 		/// </summary>
-		protected virtual Task OnBehind()
-		{
-			return Util.Successed;
-		}
+		protected virtual Task OnBehind() => Util.Successed;
 
 		/// <summary>
 		/// UIが最前面から後ろになった際に実行されます。Close時は実行されません。
 		/// デフォルトでは可能であれば閉じるアニメーションを実行します。
 		/// </summary>
-		protected virtual Task OnBehindTransition()
+		protected virtual async Task<bool> OnBehindTransition(HideTransitionOption type)
 		{
-			if (IsHideInBehind && Transition != null)
+			if (type == HideTransitionOption.Disable)
+			{
+				return false;
+			}
+			bool deactivate = IsBehindDeactivate(type);
+			bool hideAnim = UseHideTransition(type);
+			if (hideAnim && Transition != null)
 			{
 				var hide = Transition.Hide(false);
-				if (hide != null) return hide;
+				if (hide != null)
+				{
+					await hide;
+				}
 			}
-			return Util.Successed;
+			return deactivate;
 		}
 
+		/// <summary>
+		///　Behind時に自身のゲームオブジェクトを非アクティブにするか？
+		/// </summary>
+		protected virtual bool IsBehindDeactivate(HideTransitionOption option)
+		{
+			switch (option)
+			{
+				case HideTransitionOption.DeactivateOnly:
+				case HideTransitionOption.Deactivate:
+					return true;
+				case HideTransitionOption.TransitionOnly:
+				case HideTransitionOption.Disable:
+					return false;
+			}
+			return m_IsDeactivateInBehind;
+		}
+
+		/// <summary>
+		///　Behind時に非表示アニメーション処理を実行するか？
+		///　デフォルトの動作はIsDeactivateInBehindと同じ値になります。
+		/// </summary>
+		protected virtual bool UseHideTransition(HideTransitionOption option)
+		{
+			switch (option)
+			{
+				case HideTransitionOption.DeactivateOnly:
+					return false;
+				case HideTransitionOption.TransitionOnly:
+					return true;
+			}
+			return IsBehindDeactivate(option);
+		}
 
 	}
 }

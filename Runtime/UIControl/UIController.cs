@@ -201,7 +201,7 @@ namespace ILib.UI
 
 				ui.SetController(this);
 
-				var behind = parent?.Control?.OnBehind() ?? Util.Successed;
+				var behind = parent?.Control?.OnBehind(prm);
 
 				await ui.OnCreated(prm);
 
@@ -209,11 +209,11 @@ namespace ILib.UI
 
 				if (behind != null && IsWaitBehindBeforeOnFront<T>(path, prm))
 				{
-					await behind;
+					var hide = await behind;
 					behind = null;
-					if (parent != null && parent.Control != null)
+					if (hide && parent != null && parent.Control != null)
 					{
-						if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+						parent.Object.SetActive(false);
 					}
 				}
 
@@ -221,10 +221,10 @@ namespace ILib.UI
 
 				if (behind != null)
 				{
-					await behind;
-					if (parent != null && parent.Control != null)
+					var hide = await behind;
+					if (hide && parent != null && parent.Control != null)
 					{
-						if (parent.Control.IsDeactivateInBehind) parent.Object.SetActive(false);
+						parent.Object.SetActive(false);
 					}
 				}
 

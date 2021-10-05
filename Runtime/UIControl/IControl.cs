@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace ILib.UI
 {
@@ -16,7 +14,9 @@ namespace ILib.UI
 		/// <summary>
 		/// Behind時に非アクティブにするか？
 		/// </summary>
+		[System.Obsolete("OnBehindで結果を返す形に変更になりました。", true)]
 		bool IsDeactivateInBehind { get; }
+
 		void SetController(IController controller);
 		/// <summary>
 		/// UI作成直後に実行されます
@@ -28,8 +28,9 @@ namespace ILib.UI
 		Task OnFront(bool open);
 		/// <summary>
 		/// UIが最前面から後ろに回った際に実行されます。
+		/// trueが返る場合はオブジェクト自体を非アクティブにします。
 		/// </summary>
-		Task OnBehind();
+		Task<bool> OnBehind(object prm);
 		/// <summary>
 		/// UIを閉じる際に実行されます。
 		/// </summary>
